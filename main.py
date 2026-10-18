@@ -1,61 +1,71 @@
 """
 main.py
-Interface do usuário e lógica de tiragem de cartas usando Kivy.
+Interface gráfica do Tarot com suporte à exibição de imagens das cartas.
 """
 
+import os
 import random
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.uix.button import Button
+from kivy.uix.image import Image
 from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
 
-# Importa a nossa lista com os 22 Arcanos Maiores
 from cards_data import ARCANOS_MAIORES
 
-# Define o tamanho inicial da janela simulando um smartphone moderno (ex: 390x844)
+# Dimensões da janela simulando um telemóvel
 Window.size = (390, 800)
 
 
 class TarotApp(App):
     def build(self):
-        self.title = "Tarot Mobile - Protótipo"
+        self.title = "Tarot Mobile - Protótipo com Imagens"
 
-        # Layout raiz vertical com espaçamento
-        root = BoxLayout(orientation='vertical', padding=18, spacing=14)
+        # Layout vertical principal
+        root = BoxLayout(orientation='vertical', padding=16, spacing=12)
 
-        # Cabeçalho da aplicação
+        # Cabeçalho
         header = Label(
             text="[b]TAROT DOS ARCANOS[/b]",
             markup=True,
             font_size="22sp",
             size_hint_y=None,
-            height=40,
-            color=(0.95, 0.85, 0.5, 1)  # Tom dourado suave
+            height=36,
+            color=(0.95, 0.85, 0.5, 1)
         )
         root.add_widget(header)
 
-        # Área de rolagem para o texto do resultado (garante que caiba no celular)
+        # Widget de Imagem da Carta (proporção mantida)
+        self.card_image = Image(
+            source="",  # Inicia vazio até o primeiro sorteio
+            size_hint_y=None,
+            height=260,
+            allow_stretch=True,
+            keep_ratio=True
+        )
+        root.add_widget(self.card_image)
+
+        # Área de texto com barra de rolagem para explicações
         scroll_view = ScrollView(size_hint=(1, 1))
         self.result_label = Label(
-            text="Bem-vindo ao Tarot!\nEscolha uma das tiragens abaixo para iniciar sua leitura.",
+            text="Selecione uma tiragem abaixo para começar.",
             font_size="15sp",
             halign="center",
-            valign="middle",
+            valign="top",
             size_hint_y=None,
             color=(0.9, 0.9, 0.9, 1)
         )
-        # Permite que o texto se ajuste automaticamente à largura e altura da tela
+        # Permite que o texto se auto-ajuste à largura da janela
         self.result_label.bind(width=lambda s, w: s.setter('text_size')(s, (w - 20, None)))
-        self.result_label.bind(texture_size=lambda s, size: s.setter('height')(s, max(size[1], 300)))
+        self.result_label.bind(texture_size=lambda s, size: s.setter('height')(s, max(size[1], 150)))
         scroll_view.add_widget(self.result_label)
         root.add_widget(scroll_view)
 
-        # Container para os botões de ação
+        # Linha inferior de botões
         buttons_box = BoxLayout(orientation='horizontal', size_hint_y=None, height=52, spacing=10)
 
-        # Botão 1: Carta do Dia
         btn_one_card = Button(
             text="Carta do Dia",
             font_size="15sp",
@@ -64,7 +74,6 @@ class TarotApp(App):
         btn_one_card.bind(on_press=self.tirar_uma_carta)
         buttons_box.add_widget(btn_one_card)
 
-        # Botão 2: Três Cartas (Passado, Presente e Futuro)
         btn_three_cards = Button(
             text="3 Cartas",
             font_size="15sp",
@@ -76,34 +85,49 @@ class TarotApp(App):
         root.add_widget(buttons_box)
         return root
 
-    def sortear_carta(self, carta_dict):
-        """
-        Recebe o dicionário da carta e decide aleatoriamente
-        se ela saiu na posição normal ou invertida.
-        """
-        invertida = random.choice([True, False])
-        posicao = "Invertida" if invertida else "Normal"
-        significado = carta_dict["invertida"] if invertida else carta_dict["normal"]
-        return f"{carta_dict['nome']} ({posicao})\n{significado}"
+    def atualizar_imagem(self, caminho_imagem):
+        """Verifica se o ficheiro de imagem existe antes de tentar carregar."""
+        if os.path.exists(caminho_imagem):
+            self.card_image.source = caminho_imagem
+            self.card_image.reload()
+        else:
+            # Se o ficheiro ainda não foi adicionado na pasta, limpa o widget sem dar erro
+            self.card_image.source = ""
 
     def tirar_uma_carta(self, instance):
-        """Sorteia uma única carta do baralho."""
+        """Sorteia uma única carta e atualiza a imagem e o texto."""
         carta = random.choice(ARCANOS_MAIORES)
-        resultado = self.sortear_carta(carta)
-        self.result_label.text = f"[b]--- CARTA DO DIA ---[/b]\n\n{resultado}"
+        invertida = random.choice([True, False])
+        posicao = "Invertida" if invertida else "Normal"
+        significado = carta["invertida"] if invertida else carta["normal"]
+
+        # Atualiza a imagem na tela
+        self.atualizar_imagem(carta["imagem"])
+
+        # Atualiza a descrição
+        self.result_label.text = (
+            f"[b]--- CARTA DO DIA ---[/b]\n\n"
+            f"[size=18sp]{carta['nome']}[/size] ({posicao})\n\n"
+            f"{significado}"
+        )
         self.result_label.markup = True
 
     def tirar_tres_cartas(self, instance):
-        """Sorteia três cartas sem repetição para Passado, Presente e Futuro."""
-        cartas_sorteadas = random.sample(ARCANOS_MAIORES, 3)
+        """Sorteia três cartas para Passado, Presente e Futuro."""
+        cartas = random.sample(ARCANOS_MAIORES, 3)
         posicoes = ["Passado", "Presente", "Futuro"]
-        
-        texto_final = "[b]--- TIRAGEM DE 3 CARTAS ---[/b]\n\n"
-        for i in range(3):
-            detalhe = self.sortear_carta(cartas_sorteadas[i])
-            texto_final += f"[b]{posicoes[i]}:[/b]\n{detalhe}\n\n"
 
-        self.result_label.text = texto_final.strip()
+        # Mostra a imagem da carta central (Presente) como destaque principal
+        self.atualizar_imagem(cartas[1]["imagem"])
+
+        texto = "[b]--- TIRAGEM DE 3 CARTAS ---[/b]\n\n"
+        for i in range(3):
+            invertida = random.choice([True, False])
+            pos = "Invertida" if invertida else "Normal"
+            sig = cartas[i]["invertida"] if invertida else cartas[i]["normal"]
+            texto += f"[b]{posicoes[i]}:[/b] {cartas[i]['nome']} ({pos})\n{sig}\n\n"
+
+        self.result_label.text = texto.strip()
         self.result_label.markup = True
 
 
