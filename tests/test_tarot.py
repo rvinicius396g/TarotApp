@@ -68,3 +68,29 @@ class TestLogicaSorteio:
         baralho_insuficiente = [{"id": 0, "nome": "O Louco", "imagem": "", "normal": "", "invertida": ""}]
         with pytest.raises(ValueError):
             tarot_logic.tirar_tres_cartas(baralho_insuficiente)
+
+import database
+
+class TestHistoricoDatabase:
+    """Testa a integridade das operações de base de dados SQLite."""
+
+    def test_salvar_e_obter_historico(self, tmp_path):
+        # Cria uma base de dados temporária isolada para o teste
+        test_db = str(tmp_path / "teste_tarot.db")
+        
+        database.salvar_tiragem("UtilizadorTeste", "Carta do Dia", "O Louco (Normal)", db_path=test_db)
+        historico = database.obter_historico("UtilizadorTeste", db_path=test_db)
+
+        assert len(historico) == 1
+        assert historico[0]["tipo"] == "Carta do Dia"
+        assert historico[0]["conteudo"] == "O Louco (Normal)"
+        assert "data_hora" in historico[0]
+
+    def test_limpar_historico(self, tmp_path):
+        test_db = str(tmp_path / "teste_tarot.db")
+        
+        database.salvar_tiragem("UtilizadorTeste", "Tiragem de 3", "Conteúdo teste", db_path=test_db)
+        assert len(database.obter_historico("UtilizadorTeste", db_path=test_db)) == 1
+
+        database.limpar_historico("UtilizadorTeste", db_path=test_db)
+        assert len(database.obter_historico("UtilizadorTeste", db_path=test_db)) == 0
