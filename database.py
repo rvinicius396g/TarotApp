@@ -16,6 +16,16 @@ def _resolver_caminho_db(db_path=DB_NAME):
     """Garante caminho gravável tanto no Desktop quanto no Android."""
     if db_path != DB_NAME:
         return db_path
+    try:
+        from kivy.app import App
+        from kivy.utils import platform
+        if platform == "android":
+            app = App.get_running_app()
+            if app and getattr(app, "user_data_dir", None):
+                os.makedirs(app.user_data_dir, exist_ok=True)
+                return os.path.join(app.user_data_dir, DB_NAME)
+    except Exception:
+        pass
     if "ANDROID_PRIVATE" in os.environ:
         return os.path.join(os.environ["ANDROID_PRIVATE"], DB_NAME)
     return db_path

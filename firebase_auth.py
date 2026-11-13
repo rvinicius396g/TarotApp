@@ -5,8 +5,21 @@ Suporta criação de conta (signUp), login com e-mail/senha (signInWithPassword)
 e atualização de perfil (update).
 """
 
+import json
 import os
-import requests
+import ssl
+import urllib.error
+import urllib.request
+
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    import certifi
+except ImportError:
+    certifi = None
 
 
 def _carregar_env_local(caminho_env=".env"):
@@ -30,11 +43,18 @@ def _carregar_env_local(caminho_env=".env"):
 
 _carregar_env_local()
 
+try:
+    from firebase_config import FIREBASE_WEB_API_KEY as _CONFIG_API_KEY
+    if _CONFIG_API_KEY and "FIREBASE_WEB_API_KEY" not in os.environ:
+        os.environ["FIREBASE_WEB_API_KEY"] = _CONFIG_API_KEY
+except ImportError:
+    pass
+
 
 class FirebaseAuthClient:
     BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts"
 
-    # Tradução amigáveis dos códigos de erro comuns do Firebase
+    # Tradução amigável dos códigos de erro comuns do Firebase
     MENSAGENS_ERRO = {
         "EMAIL_EXISTS": "Este e-mail já está cadastrado.",
         "INVALID_EMAIL": "Formato de e-mail inválido.",
@@ -66,6 +86,33 @@ class FirebaseAuthClient:
                 return msg
         return f"Erro na autenticação ({codigo_erro})."
 
+    def _post_json(self, url, payload):
+        """Executa POST JSON via requests (ou urllib nativo como fallback seguro no Android)."""
+        if requests is not None:
+            verify_ssl = certifi.where() if certifi is not None else True
+            resp = requests.post(url, json=payload, timeout=self.timeout, verify=verify_ssl)
+            return resp.status_code, resp.json()
+
+        corpo = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=corpo,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        ctx = (
+            ssl.create_default_context(cafile=certifi.where())
+            if certifi is not None
+            else ssl.create_default_context()
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as resp:
+                dados = json.loads(resp.read().decode("utf-8"))
+                return resp.status, dados
+        except urllib.error.HTTPError as e:
+            dados = json.loads(e.read().decode("utf-8"))
+            return e.code, dados
+
     def sign_up(self, email, password, display_name=None):
         """Cria um novo usuário no Firebase Auth com e-mail e senha."""
         if not self.possui_chave_valida():
@@ -77,9 +124,8 @@ class FirebaseAuthClient:
             "returnSecureToken": True,
         }
         try:
-            resp = requests.post(self._endpoint("signUp"), json=payload, timeout=self.timeout)
-            dados = resp.json()
-            if resp.status_code == 200:
+            status_code, dados = self._post_json(self._endpoint("signUp"), payload)
+            if status_code == 200:
                 id_token = dados.get("idToken")
                 if display_name and id_token:
                     self.update_profile(id_token, display_name)
@@ -93,7 +139,7 @@ class FirebaseAuthClient:
                 }
             codigo = dados.get("error", {}).get("message", "ERRO_DESCONHECIDO")
             return {"sucesso": False, "erro": self._traduzir_erro(codigo), "codigo": codigo}
-        except requests.RequestException as exc:
+        except Exception as exc:
             return {"sucesso": False, "erro": f"Falha de conexão com o Firebase: {exc}"}
 
     def sign_in_with_password(self, email, password):
@@ -107,11 +153,8 @@ class FirebaseAuthClient:
             "returnSecureToken": True,
         }
         try:
-            resp = requests.post(
-                self._endpoint("signInWithPassword"), json=payload, timeout=self.timeout
-            )
-            dados = resp.json()
-            if resp.status_code == 200:
+            status_code, dados = self._post_json(self._endpoint("signInWithPassword"), payload)
+            if status_code == 200:
                 return {
                     "sucesso": True,
                     "id_token": dados.get("idToken"),
@@ -122,7 +165,7 @@ class FirebaseAuthClient:
                 }
             codigo = dados.get("error", {}).get("message", "ERRO_DESCONHECIDO")
             return {"sucesso": False, "erro": self._traduzir_erro(codigo), "codigo": codigo}
-        except requests.RequestException as exc:
+        except Exception as exc:
             return {"sucesso": False, "erro": f"Falha de conexão com o Firebase: {exc}"}
 
     def update_profile(self, id_token, display_name):
@@ -136,9 +179,8 @@ class FirebaseAuthClient:
             "returnSecureToken": True,
         }
         try:
-            resp = requests.post(self._endpoint("update"), json=payload, timeout=self.timeout)
-            dados = resp.json()
-            if resp.status_code == 200:
+            status_code, dados = self._post_json(self._endpoint("update"), payload)
+            if status_code == 200:
                 return {
                     "sucesso": True,
                     "nome": dados.get("displayName", display_name),
@@ -146,5 +188,5 @@ class FirebaseAuthClient:
                 }
             codigo = dados.get("error", {}).get("message", "ERRO_DESCONHECIDO")
             return {"sucesso": False, "erro": self._traduzir_erro(codigo), "codigo": codigo}
-        except requests.RequestException as exc:
+        except Exception as exc:
             return {"sucesso": False, "erro": f"Falha de conexão com o Firebase: {exc}"}

@@ -24,11 +24,12 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      - name: Gerar arquivo .env com a chave Firebase (GitHub Secret)
+      - name: Gerar configuracao Firebase para o APK (GitHub Secret)
         env:
           FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         run: |
           echo "FIREBASE_WEB_API_KEY=${FIREBASE_WEB_API_KEY}" > .env
+          echo "FIREBASE_WEB_API_KEY = '${FIREBASE_WEB_API_KEY}'" > firebase_config.py
 
       - name: Executar Testes Unitarios (pytest)
         run: |
@@ -74,6 +75,7 @@ jobs:
 
       - name: Compilar APK com Buildozer
         run: |
+          rm -rf .buildozer/android/platform/build-*/dists .buildozer/android/platform/build-*/build/python-installs .buildozer/android/app bin/*.apk
           yes | buildozer -v android debug || [ -n "$(ls bin/*.apk 2>/dev/null)" ]
 
       - name: Salvar Cache do Buildozer

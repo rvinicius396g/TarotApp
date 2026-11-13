@@ -3,6 +3,7 @@ __pycache__/
 .buildozer/
 bin/
 .env
+firebase_config.py
 venv/
 .venv/
 *.db

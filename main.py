@@ -26,9 +26,6 @@ if platform not in ("android", "ios"):
     Window.size = (390, 800)
 auth = AuthService()
 
-# Garante a criação da tabela da base de dados ao iniciar
-database.inicializar_banco()
-
 
 class LoginScreen(Screen):
     """Ecrã de Login com layout centralizado e atmosfera mística."""
@@ -585,11 +582,22 @@ class HistoryScreen(Screen):
 class TarotApp(App):
     def build(self):
         self.title = "Tarot Mobile"
-        sm = ScreenManager()
-        sm.add_widget(LoginScreen(name='login_screen'))
-        sm.add_widget(TarotScreen(name='tarot_screen'))
-        sm.add_widget(HistoryScreen(name='history_screen'))
-        return sm
+        try:
+            database.inicializar_banco()
+            sm = ScreenManager()
+            sm.add_widget(LoginScreen(name='login_screen'))
+            sm.add_widget(TarotScreen(name='tarot_screen'))
+            sm.add_widget(HistoryScreen(name='history_screen'))
+            return sm
+        except Exception:
+            import traceback
+            erro_txt = traceback.format_exc()
+            return Label(
+                text=f"Erro ao iniciar:\n{erro_txt}",
+                font_size="11sp",
+                halign="left",
+                valign="middle"
+            )
 
 
 if __name__ == '__main__':
