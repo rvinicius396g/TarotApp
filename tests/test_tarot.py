@@ -94,3 +94,23 @@ class TestHistoricoDatabase:
 
         database.limpar_historico("UtilizadorTeste", db_path=test_db)
         assert len(database.obter_historico("UtilizadorTeste", db_path=test_db)) == 0
+
+from auth_service import AuthService
+
+class TestAuthService:
+    """Testa o gerenciamento de sessão de usuário."""
+
+    def test_login_demo_define_usuario_e_nome(self):
+        auth = AuthService()
+        resposta = auth.login_com_firebase("vinicius396g@gmail.com", "F2x1dDu$4CEE")
+        assert resposta["sucesso"] is True
+        assert auth.esta_autenticado() is True
+        assert auth.usuario_atual["nome"] == "Vinicius"
+
+    def test_logout_limpa_sessao(self):
+        auth = AuthService()
+        auth.login_google(nome="Júnior")
+        assert auth.esta_autenticado() is True
+        auth.logout()
+        assert auth.esta_autenticado() is False
+        assert auth.usuario_atual is None

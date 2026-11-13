@@ -11,16 +11,19 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.uix.button import Button
+from kivy.uix.textinput import TextInput
 from kivy.uix.image import Image
 from kivy.uix.scrollview import ScrollView
 from kivy.graphics import Color, Rectangle, RoundedRectangle
 from kivy.core.window import Window
+from kivy.utils import platform
 
 import tarot_logic
 import database
 from auth_service import AuthService
 
-Window.size = (390, 800)
+if platform not in ("android", "ios"):
+    Window.size = (390, 800)
 auth = AuthService()
 
 # Garante a criação da tabela da base de dados ao iniciar
@@ -53,14 +56,14 @@ class LoginScreen(Screen):
 
         content_box = BoxLayout(
             orientation='vertical',
-            spacing=16,
-            padding=[24, 20, 24, 20],
-            size_hint=(0.9, 0.78),
+            spacing=10,
+            padding=[22, 18, 22, 18],
+            size_hint=(0.9, 0.88),
             pos_hint={'center_x': 0.5, 'center_y': 0.5}
         )
 
         with content_box.canvas.before:
-            Color(0.12, 0.10, 0.22, 0.70)
+            Color(0.12, 0.10, 0.22, 0.78)
             self.card_bg = RoundedRectangle(
                 size=content_box.size,
                 pos=content_box.pos,
@@ -69,18 +72,18 @@ class LoginScreen(Screen):
         content_box.bind(size=self._atualizar_card, pos=self._atualizar_card)
 
         titulo = Label(
-            text="[b]TAROT MÍSTICO[/b]",
+            text="[b]TAROT MISTICO[/b]",
             markup=True,
-            font_size="24sp",
+            font_size="23sp",
             size_hint_y=None,
-            height=36,
+            height=32,
             color=(0.96, 0.82, 0.38, 1)
         )
         subtitulo = Label(
             text="Descubra os segredos do seu destino",
-            font_size="13sp",
+            font_size="12sp",
             size_hint_y=None,
-            height=22,
+            height=20,
             color=(0.78, 0.75, 0.88, 1)
         )
         content_box.add_widget(titulo)
@@ -91,44 +94,100 @@ class LoginScreen(Screen):
             icone_central = Image(
                 source=caminho_icone,
                 size_hint=(1, None),
-                height=170,
+                height=125,
                 allow_stretch=True,
                 keep_ratio=True
             )
             content_box.add_widget(icone_central)
 
-        texto_convite = Label(
-            text="Conecte-se para salvar o histórico das suas\ntiragens e consultar a sua Carta do Dia.",
-            font_size="12sp",
+        self.input_email = TextInput(
+            hint_text="E-mail (ex: vinicius396g@gmail.com)",
+            multiline=False,
+            size_hint_y=None,
+            height=42,
+            font_size="13sp",
+            padding=[12, 10, 12, 10],
+            background_color=(0.18, 0.16, 0.30, 1),
+            foreground_color=(0.96, 0.96, 1, 1),
+            hint_text_color=(0.62, 0.60, 0.74, 1),
+            cursor_color=(0.96, 0.82, 0.38, 1)
+        )
+        content_box.add_widget(self.input_email)
+
+        self.input_senha = TextInput(
+            hint_text="Senha (minimo 6 caracteres)",
+            password=True,
+            multiline=False,
+            size_hint_y=None,
+            height=42,
+            font_size="13sp",
+            padding=[12, 10, 12, 10],
+            background_color=(0.18, 0.16, 0.30, 1),
+            foreground_color=(0.96, 0.96, 1, 1),
+            hint_text_color=(0.62, 0.60, 0.74, 1),
+            cursor_color=(0.96, 0.82, 0.38, 1)
+        )
+        content_box.add_widget(self.input_senha)
+
+        self.lbl_status = Label(
+            text="Entre com sua conta Firebase ou crie uma nova.",
+            font_size="11sp",
             halign="center",
             size_hint_y=None,
-            height=46,
+            height=30,
             color=(0.82, 0.82, 0.88, 1)
         )
-        texto_convite.bind(width=lambda s, w: s.setter('text_size')(s, (w - 20, None)))
-        content_box.add_widget(texto_convite)
+        self.lbl_status.bind(width=lambda s, w: s.setter('text_size')(s, (w - 10, None)))
+        content_box.add_widget(self.lbl_status)
+
+        btn_entrar = Button(
+            text="Entrar com E-mail",
+            font_size="14sp",
+            size_hint_y=None,
+            height=44,
+            background_color=(0.24, 0.56, 0.44, 1),
+            color=(1, 1, 1, 1)
+        )
+        btn_entrar.bind(on_press=self.fazer_login_firebase)
+        content_box.add_widget(btn_entrar)
+
+        btn_registrar = Button(
+            text="Criar Nova Conta",
+            font_size="13sp",
+            size_hint_y=None,
+            height=40,
+            background_color=(0.32, 0.28, 0.56, 1),
+            color=(0.96, 0.88, 0.55, 1)
+        )
+        btn_registrar.bind(on_press=self.registrar_conta_firebase)
+        content_box.add_widget(btn_registrar)
+
+        social_box = BoxLayout(
+            orientation='horizontal',
+            spacing=10,
+            size_hint_y=None,
+            height=40
+        )
 
         btn_google = Button(
-            text="Continuar com Google",
-            font_size="15sp",
-            size_hint_y=None,
-            height=48,
+            text="Google",
+            font_size="13sp",
             background_color=(0.86, 0.27, 0.22, 1),
             color=(1, 1, 1, 1)
         )
         btn_google.bind(on_press=self.fazer_login_google)
-        content_box.add_widget(btn_google)
+        social_box.add_widget(btn_google)
 
         btn_facebook = Button(
-            text="Continuar com Facebook",
-            font_size="15sp",
-            size_hint_y=None,
-            height=48,
+            text="Facebook",
+            font_size="13sp",
             background_color=(0.18, 0.40, 0.72, 1),
             color=(1, 1, 1, 1)
         )
         btn_facebook.bind(on_press=self.fazer_login_facebook)
-        content_box.add_widget(btn_facebook)
+        social_box.add_widget(btn_facebook)
+
+        content_box.add_widget(social_box)
 
         root_layout.add_widget(content_box)
         self.add_widget(root_layout)
@@ -142,16 +201,39 @@ class LoginScreen(Screen):
         self.card_bg.pos = instance.pos
 
     def navegar_para_tarot(self):
+        self.input_senha.text = ""
+        self.lbl_status.text = "Entre com sua conta Firebase ou crie uma nova."
+        self.lbl_status.color = (0.82, 0.82, 0.88, 1)
         self.manager.transition = SlideTransition(direction='left')
         self.manager.current = 'tarot_screen'
         self.manager.get_screen('tarot_screen').ao_entrar_na_tela()
 
+    def fazer_login_firebase(self, instance):
+        email = self.input_email.text.strip()
+        senha = self.input_senha.text.strip()
+        resultado = auth.login_com_firebase(email, senha)
+        if resultado.get("sucesso"):
+            self.navegar_para_tarot()
+        else:
+            self.lbl_status.text = resultado.get("erro", "Falha ao autenticar.")
+            self.lbl_status.color = (0.98, 0.42, 0.42, 1)
+
+    def registrar_conta_firebase(self, instance):
+        email = self.input_email.text.strip()
+        senha = self.input_senha.text.strip()
+        resultado = auth.registrar_com_firebase(email, senha)
+        if resultado.get("sucesso"):
+            self.navegar_para_tarot()
+        else:
+            self.lbl_status.text = resultado.get("erro", "Falha ao criar conta.")
+            self.lbl_status.color = (0.98, 0.42, 0.42, 1)
+
     def fazer_login_google(self, instance):
-        auth.login_google(nome="Júnior")
+        auth.login_google(nome="Junior")
         self.navegar_para_tarot()
 
     def fazer_login_facebook(self, instance):
-        auth.login_facebook(nome="Júnior")
+        auth.login_facebook(nome="Junior")
         self.navegar_para_tarot()
 
 
@@ -484,7 +566,7 @@ class HistoryScreen(Screen):
         texto = ""
         for item in registos:
             texto += (
-                f"[color=f5d160][b]{item['tipo']} • {item['data_hora']}[/b][/color]\n"
+                f"[color=f5d160][b]{item['tipo']} - {item['data_hora']}[/b][/color]\n"
                 f"{item['conteudo']}\n"
                 f"[color=444455]----------------------------------------[/color]\n\n"
             )

@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
+
+jobs:
+  build-android:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout do Codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gerar arquivo .env com a chave Firebase (GitHub Secret)
+        env:
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: |
+          echo "FIREBASE_WEB_API_KEY=${FIREBASE_WEB_API_KEY}" > .env
+
+      - name: Executar Testes Unitarios (pytest)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest requests
+          python -m pytest tests/ -v
+
+      - name: Compilar APK com Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          command: buildozer android debug
+          buildozer_version: master
+
+      - name: Publicar Artefato APK para Download
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarot-mistico-apk
+          path: ${{ steps.buildozer.outputs.filename }}

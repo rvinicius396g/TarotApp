@@ -4,6 +4,7 @@ Módulo responsável por gerir a base de dados SQLite local
 para armazenar o histórico de tiragens de cada utilizador.
 """
 
+import os
 import sqlite3
 from datetime import datetime
 
@@ -11,9 +12,19 @@ from datetime import datetime
 DB_NAME = "tarot_history.db"
 
 
+def _resolver_caminho_db(db_path=DB_NAME):
+    """Garante caminho gravável tanto no Desktop quanto no Android."""
+    if db_path != DB_NAME:
+        return db_path
+    if "ANDROID_PRIVATE" in os.environ:
+        return os.path.join(os.environ["ANDROID_PRIVATE"], DB_NAME)
+    return db_path
+
+
 def obter_conexao(db_path=DB_NAME):
     """Cria e devolve uma ligação à base de dados SQLite."""
-    conn = sqlite3.connect(db_path)
+    caminho_real = _resolver_caminho_db(db_path)
+    conn = sqlite3.connect(caminho_real)
     # Permite aceder aos campos por nome de coluna
     conn.row_factory = sqlite3.Row
     return conn
