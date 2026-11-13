@@ -5,6 +5,7 @@ de tiragens com persistência em SQLite.
 """
 
 import os
+import traceback
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.uix.floatlayout import FloatLayout
@@ -18,13 +19,20 @@ from kivy.graphics import Color, Rectangle, RoundedRectangle
 from kivy.core.window import Window
 from kivy.utils import platform
 
-import tarot_logic
-import database
-from auth_service import AuthService
-
 if platform not in ("android", "ios"):
     Window.size = (390, 800)
-auth = AuthService()
+
+ERRO_INICIALIZACAO = None
+try:
+    import tarot_logic
+    import database
+    from auth_service import AuthService
+    auth = AuthService()
+except Exception:
+    ERRO_INICIALIZACAO = traceback.format_exc()
+    tarot_logic = None
+    database = None
+    auth = None
 
 
 class LoginScreen(Screen):
@@ -582,6 +590,13 @@ class HistoryScreen(Screen):
 class TarotApp(App):
     def build(self):
         self.title = "Tarot Mobile"
+        if ERRO_INICIALIZACAO:
+            return Label(
+                text=f"Erro na importacao:\n{ERRO_INICIALIZACAO}",
+                font_size="11sp",
+                halign="left",
+                valign="middle"
+            )
         try:
             database.inicializar_banco()
             sm = ScreenManager()
@@ -590,7 +605,6 @@ class TarotApp(App):
             sm.add_widget(HistoryScreen(name='history_screen'))
             return sm
         except Exception:
-            import traceback
             erro_txt = traceback.format_exc()
             return Label(
                 text=f"Erro ao iniciar:\n{erro_txt}",

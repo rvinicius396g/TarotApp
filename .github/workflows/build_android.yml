@@ -37,17 +37,21 @@ jobs:
           pip install pytest requests
           python -m pytest tests/ -v
 
-      - name: Restaurar Cache do Buildozer
+      - name: Restaurar Cache Global do Android SDK/NDK
+        uses: actions/cache/restore@v4
+        id: cache-sdk
+        with:
+          path: ~/.buildozer
+          key: android-sdk-ndk-${{ runner.os }}-v1
+          restore-keys: |
+            android-sdk-ndk-${{ runner.os }}-
+
+      - name: Restaurar Cache Limpo do Buildozer (v4)
         uses: actions/cache/restore@v4
         id: cache-buildozer
         with:
-          path: |
-            .buildozer
-            ~/.buildozer
-          key: buildozer-${{ runner.os }}-v3-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-${{ runner.os }}-v3-
-            buildozer-${{ runner.os }}-v2-
+          path: .buildozer
+          key: buildozer-clean-${{ runner.os }}-v4-${{ hashFiles('buildozer.spec') }}
 
       - name: Instalar Dependencias Linux (Android SDK/NDK)
         run: |
@@ -67,6 +71,9 @@ jobs:
           wheel<0.45
           cython==0.29.36
           virtualenv<20.26
+          urllib3<2.0
+          requests<2.32
+          charset-normalizer<3.0
           EOF
           echo "PIP_CONSTRAINT=$HOME/pip-constraints.txt" >> $GITHUB_ENV
           echo "VIRTUALENV_NO_PERIODIC_UPDATE=1" >> $GITHUB_ENV
@@ -75,17 +82,22 @@ jobs:
 
       - name: Compilar APK com Buildozer
         run: |
-          rm -rf .buildozer/android/platform/build-*/dists .buildozer/android/platform/build-*/build/python-installs .buildozer/android/app bin/*.apk
+          rm -rf .buildozer/android/app bin/*.apk
           yes | buildozer -v android debug || [ -n "$(ls bin/*.apk 2>/dev/null)" ]
 
-      - name: Salvar Cache do Buildozer
+      - name: Salvar Cache Global do Android SDK/NDK
+        uses: actions/cache/save@v4
+        if: always() && steps.cache-sdk.outputs.cache-hit != 'true'
+        with:
+          path: ~/.buildozer
+          key: android-sdk-ndk-${{ runner.os }}-v1
+
+      - name: Salvar Cache Limpo do Buildozer (v4)
         uses: actions/cache/save@v4
         if: always() && steps.cache-buildozer.outputs.cache-hit != 'true'
         with:
-          path: |
-            .buildozer
-            ~/.buildozer
-          key: buildozer-${{ runner.os }}-v3-${{ hashFiles('buildozer.spec') }}
+          path: .buildozer
+          key: buildozer-clean-${{ runner.os }}-v4-${{ hashFiles('buildozer.spec') }}
 
       - name: Publicar Artefato APK para Download
         uses: actions/upload-artifact@v4

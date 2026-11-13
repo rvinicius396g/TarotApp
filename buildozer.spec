@@ -19,11 +19,10 @@ source.include_exts = py,png,jpg,kv,atlas
 source.exclude_dirs = tests, bin, .venv, venv, __pycache__, .pytest_cache, .git
 
 # (str) Versão do aplicativo
-version = 1.0.1
+version = 1.0.2
 
 # (list) Dependências Python e receitas compiladas pelo python-for-android
-# Usa pacotes pure-Python para requests/urllib3 evitando binários x86_64 no ARM64
-requirements = python3,kivy==2.3.1,requests==2.31.0,urllib3==1.26.18,chardet,idna,certifi,sqlite3,openssl
+requirements = python3,kivy==2.3.0,requests,urllib3,chardet,idna,certifi,sqlite3,openssl
 
 # (str) Ícone e tela de abertura (Splash Screen) do aplicativo
 icon.filename = %(source.dir)s/assets/images/0_o_louco.png
