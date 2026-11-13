@@ -26,7 +26,7 @@ jobs:
 
       - name: Executar Testes Unitarios (pytest)
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade "pip<25"
           pip install pytest requests
           python -m pytest tests/ -v
 
@@ -36,9 +36,9 @@ jobs:
           path: |
             .buildozer
             ~/.buildozer
-          key: buildozer-${{ runner.os }}-v1-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-${{ runner.os }}-v2-${{ hashFiles('buildozer.spec') }}
           restore-keys: |
-            buildozer-${{ runner.os }}-v1-
+            buildozer-${{ runner.os }}-v2-
 
       - name: Instalar Dependencias Linux e Java 17 (Android SDK/NDK)
         run: |
@@ -48,12 +48,21 @@ jobs:
             autoconf libtool pkg-config zlib1g-dev \
             libncurses5-dev libncursesw5-dev libtinfo5 \
             cmake libffi-dev libssl-dev automake \
-            gettext libltdl-dev patch
+            gettext libltdl-dev patch libsqlite3-dev
 
-      - name: Instalar Buildozer e Cython
+      - name: Instalar Buildozer e Cython com restricao de versoes estaveis
         run: |
-          python -m pip install --upgrade pip "setuptools<70" wheel
-          pip install "cython==0.29.36" buildozer
+          cat << 'EOF' > $HOME/pip-constraints.txt
+          pip==24.0
+          setuptools<70
+          wheel<0.45
+          cython==0.29.36
+          virtualenv<20.26
+          EOF
+          echo "PIP_CONSTRAINT=$HOME/pip-constraints.txt" >> $GITHUB_ENV
+          echo "VIRTUALENV_NO_PERIODIC_UPDATE=1" >> $GITHUB_ENV
+          python -m pip install -c $HOME/pip-constraints.txt --upgrade pip setuptools wheel virtualenv
+          pip install -c $HOME/pip-constraints.txt "cython==0.29.36" buildozer
 
       - name: Compilar APK com Buildozer
         run: |

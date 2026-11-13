@@ -58,8 +58,11 @@ android.ndk = 25b
 # (bool) Aceita automaticamente as licenças do Android SDK durante o build
 android.accept_sdk_license = True
 
-# (list) Arquiteturas alvo (exigidas para dispositivos modernos na Play Store)
-android.archs = arm64-v8a, armeabi-v7a
+# (list) Arquiteturas alvo (arm64-v8a cobre dispositivos Android modernos e acelera o build)
+android.archs = arm64-v8a
+
+# (str) Versão estável do python-for-android compatível com Kivy 2.3.1 (Python 3.11, evitando Python 3.14)
+p4a.branch = release-2024.01.21
 
 # (bool) Permite backup automático de dados do app pelo Android
 android.allow_backup = True
