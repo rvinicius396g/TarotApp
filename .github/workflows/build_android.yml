@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK and Play Store AAB
 
 on:
   workflow_dispatch:
@@ -24,16 +24,29 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      - name: Gerar configuracao Firebase para o APK (GitHub Secret)
+      - name: Gerar configuracao Firebase e Descriptografar Keystore (GitHub Secret)
         env:
           FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
         run: |
           echo "FIREBASE_WEB_API_KEY=${FIREBASE_WEB_API_KEY}" > .env
           echo "FIREBASE_WEB_API_KEY = '${FIREBASE_WEB_API_KEY}'" > firebase_config.py
+          python -m pip install --upgrade "pip<25" cryptography
+          python - << 'EOF'
+          import os, hashlib
+          from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+          key_str = os.environ["FIREBASE_WEB_API_KEY"].strip()
+          aes_key = hashlib.sha256(key_str.encode("utf-8")).digest()
+          with open("keystore.enc", "rb") as f:
+              raw = f.read()
+          dec = AESGCM(aes_key).decrypt(raw[:12], raw[12:], None)
+          with open("/tmp/tarot-upload-key.keystore", "wb") as f:
+              f.write(dec)
+          print("[OK] Keystore descriptografado em /tmp/tarot-upload-key.keystore")
+          EOF
+          keytool -list -v -keystore /tmp/tarot-upload-key.keystore -storepass "TarotMistico2026!"
 
       - name: Executar Testes Unitarios (pytest)
         run: |
-          python -m pip install --upgrade "pip<25"
           pip install pytest requests
           python -m pytest tests/ -v
 
@@ -52,6 +65,8 @@ jobs:
         with:
           path: .buildozer
           key: buildozer-clean-${{ runner.os }}-v4-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-clean-${{ runner.os }}-v4-
 
       - name: Instalar Dependencias Linux (Android SDK/NDK)
         run: |
@@ -80,10 +95,64 @@ jobs:
           python -m pip install -c $HOME/pip-constraints.txt --upgrade pip setuptools wheel virtualenv
           pip install -c $HOME/pip-constraints.txt "cython==0.29.36" buildozer
 
-      - name: Compilar APK com Buildozer
+      - name: Aplicar Patch Android 14/15 (RECEIVER_EXPORTED e Target API 35)
         run: |
-          rm -rf .buildozer/android/app bin/*.apk
+          # Garante que a plataforma android-35 esteja instalada no SDK
+          SDK_MGR=$(find ~/.buildozer/android/platform/android-sdk -name "sdkmanager" | head -n 1)
+          if [ -n "$SDK_MGR" ]; then
+            yes | "$SDK_MGR" "platforms;android-35" || true
+          fi
+          python - << 'EOF'
+          import glob, os
+
+          # 1. Patch HIDDeviceManager.java para Android 14+ (RECEIVER_EXPORTED = 2)
+          for path in glob.glob(".buildozer/**/HIDDeviceManager.java", recursive=True):
+              with open(path, "r", encoding="utf-8") as f:
+                  txt = f.read()
+              old_usb = "mContext.registerReceiver(mUsbBroadcast, filter);"
+              new_usb = "if (android.os.Build.VERSION.SDK_INT >= 33) { mContext.registerReceiver(mUsbBroadcast, filter, 2); } else { mContext.registerReceiver(mUsbBroadcast, filter); }"
+              old_bt = "mContext.registerReceiver(mBluetoothBroadcast, filter);"
+              new_bt = "if (android.os.Build.VERSION.SDK_INT >= 33) { mContext.registerReceiver(mBluetoothBroadcast, filter, 2); } else { mContext.registerReceiver(mBluetoothBroadcast, filter); }"
+              if old_usb in txt and "registerReceiver(mUsbBroadcast, filter, 2)" not in txt:
+                  txt = txt.replace(old_usb, new_usb).replace(old_bt, new_bt)
+                  with open(path, "w", encoding="utf-8") as f:
+                      f.write(txt)
+                  print(f"[PATCH] HIDDeviceManager atualizado: {path}")
+
+          # 2. Patch build.tmpl.gradle para targetSdkVersion 35 (exigido pelo Google Play Console)
+          api_target = "35" if os.path.exists(os.path.expanduser("~/.buildozer/android/platform/android-sdk/platforms/android-35")) else "34"
+          for path in glob.glob(".buildozer/**/build.tmpl.gradle", recursive=True):
+              with open(path, "r", encoding="utf-8") as f:
+                  txt = f.read()
+              txt = txt.replace("compileSdkVersion {{ android_api }}", f"compileSdkVersion {api_target}")
+              txt = txt.replace("targetSdkVersion {{ android_api }}", f"targetSdkVersion {api_target}")
+              with open(path, "w", encoding="utf-8") as f:
+                  f.write(txt)
+              print(f"[PATCH] build.tmpl.gradle atualizado para API {api_target}: {path}")
+          EOF
+
+      - name: Compilar APK (Teste) e AAB Assinado (Google Play Store)
+        env:
+          P4A_RELEASE_KEYSTORE: /tmp/tarot-upload-key.keystore
+          P4A_RELEASE_KEYSTORE_PASSWD: "TarotMistico2026!"
+          P4A_RELEASE_KEYALIAS: tarotmistico
+          P4A_RELEASE_KEYALIAS_PASSWD: "TarotMistico2026!"
+        run: |
+          rm -rf store_assets .buildozer/android/app bin/*.apk bin/*.aab
           yes | buildozer -v android debug || [ -n "$(ls bin/*.apk 2>/dev/null)" ]
+          rm -rf .buildozer/android/app
+          yes | buildozer -v android release || [ -n "$(ls bin/*.aab 2>/dev/null)" ]
+          for aab_file in bin/*.aab; do
+            if ! jarsigner -verify "$aab_file" | grep -q "jar verified"; then
+              echo "Assinando $aab_file com jarsigner..."
+              jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+                -keystore /tmp/tarot-upload-key.keystore \
+                -storepass "TarotMistico2026!" \
+                -keypass "TarotMistico2026!" \
+                "$aab_file" tarotmistico
+            fi
+            jarsigner -verify -verbose -certs "$aab_file"
+          done
 
       - name: Salvar Cache Global do Android SDK/NDK
         uses: actions/cache/save@v4
@@ -99,9 +168,16 @@ jobs:
           path: .buildozer
           key: buildozer-clean-${{ runner.os }}-v4-${{ hashFiles('buildozer.spec') }}
 
-      - name: Publicar Artefato APK para Download
+      - name: Publicar Artefato APK (Instalacao Direta)
         uses: actions/upload-artifact@v4
         with:
           name: tarot-mistico-apk
           path: bin/*.apk
+          if-no-files-found: warn
+
+      - name: Publicar Artefato AAB Assinado (Google Play Store)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarot-mistico-playstore-aab
+          path: bin/*.aab
           if-no-files-found: error

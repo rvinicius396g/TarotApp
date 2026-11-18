@@ -4,6 +4,9 @@ __pycache__/
 bin/
 .env
 firebase_config.py
+*.keystore
+*.jks
+*.b64.txt
 venv/
 .venv/
 *.db
