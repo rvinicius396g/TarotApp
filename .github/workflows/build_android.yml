@@ -95,13 +95,8 @@ jobs:
           python -m pip install -c $HOME/pip-constraints.txt --upgrade pip setuptools wheel virtualenv
           pip install -c $HOME/pip-constraints.txt "cython==0.29.36" buildozer
 
-      - name: Aplicar Patch Android 14/15 (RECEIVER_EXPORTED e Target API 35)
+      - name: Aplicar Patch Android (RECEIVER_EXPORTED, Target API 36 e versionCode 2)
         run: |
-          # Garante que a plataforma android-35 esteja instalada no SDK
-          SDK_MGR=$(find ~/.buildozer/android/platform/android-sdk -name "sdkmanager" | head -n 1)
-          if [ -n "$SDK_MGR" ]; then
-            yes | "$SDK_MGR" "platforms;android-35" || true
-          fi
           python - << 'EOF'
           import glob, os
 
@@ -119,16 +114,29 @@ jobs:
                       f.write(txt)
                   print(f"[PATCH] HIDDeviceManager atualizado: {path}")
 
-          # 2. Patch build.tmpl.gradle para targetSdkVersion 35 (exigido pelo Google Play Console)
-          api_target = "35" if os.path.exists(os.path.expanduser("~/.buildozer/android/platform/android-sdk/platforms/android-35")) else "34"
+          # 2. Patch build.tmpl.gradle para targetSdkVersion 36 e versionCode 2 (exigidos pelo Google Play Console)
           for path in glob.glob(".buildozer/**/build.tmpl.gradle", recursive=True):
               with open(path, "r", encoding="utf-8") as f:
                   txt = f.read()
-              txt = txt.replace("compileSdkVersion {{ android_api }}", f"compileSdkVersion {api_target}")
-              txt = txt.replace("targetSdkVersion {{ android_api }}", f"targetSdkVersion {api_target}")
+              txt = txt.replace("compileSdkVersion {{ android_api }}", "compileSdkVersion 34")
+              txt = txt.replace("compileSdkVersion 35", "compileSdkVersion 34")
+              txt = txt.replace("targetSdkVersion {{ android_api }}", "targetSdkVersion 36")
+              txt = txt.replace("targetSdkVersion 34", "targetSdkVersion 36")
+              txt = txt.replace("targetSdkVersion 35", "targetSdkVersion 36")
+              txt = txt.replace("versionCode {{ args.numeric_version }}", "versionCode 2")
+              txt = txt.replace("versionName '{{ args.version }}'", "versionName '1.0.3'")
               with open(path, "w", encoding="utf-8") as f:
                   f.write(txt)
-              print(f"[PATCH] build.tmpl.gradle atualizado para API {api_target}: {path}")
+              print(f"[PATCH] build.tmpl.gradle atualizado (targetSdkVersion 36, versionCode 2): {path}")
+
+          # 3. Patch AndroidManifest.tmpl.xml para targetSdkVersion 36
+          for path in glob.glob(".buildozer/**/AndroidManifest.tmpl.xml", recursive=True):
+              with open(path, "r", encoding="utf-8") as f:
+                  txt = f.read()
+              txt = txt.replace('android:targetSdkVersion="{{ android_api }}"', 'android:targetSdkVersion="36"')
+              with open(path, "w", encoding="utf-8") as f:
+                  f.write(txt)
+              print(f"[PATCH] AndroidManifest.tmpl.xml atualizado para API 36: {path}")
           EOF
 
       - name: Compilar APK (Teste) e AAB Assinado (Google Play Store)
